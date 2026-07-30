@@ -55,8 +55,9 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/patch_motion.py
-          grep -q "Smooth anatomically guided movement renderer" app/src/main/java/com/mysdesign/formiva/FormivaViews.java
-          grep -q "case 2: return new Pose" app/src/main/java/com/mysdesign/formiva/FormivaViews.java
+          grep -q "class ExerciseVisualView extends View" app/src/main/java/com/mysdesign/formiva/FormivaViews.java
+          grep -q "pushupBottom" app/src/main/java/com/mysdesign/formiva/FormivaViews.java
+          grep -q "drawBreathingPelvic" app/src/main/java/com/mysdesign/formiva/FormivaViews.java
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
