@@ -10,8 +10,8 @@ android {
         applicationId 'com.mysdesign.formiva'
         minSdk 26
         targetSdk 35
-        versionCode 4
-        versionName '1.2.0-real-models'
+        versionCode 5
+        versionName '1.2.1-motion-fix'
     }
 
     buildTypes {
