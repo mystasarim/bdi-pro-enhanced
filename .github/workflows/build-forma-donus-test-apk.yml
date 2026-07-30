@@ -1,32 +1,60 @@
 name: Build Forma Donus Test APK
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: forma-donus-apk-build
-      - uses: actions/setup-java@v4
+      - name: Checkout main source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - name: Install Android SDK
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+
+      - name: Show project files
+        run: |
+          pwd
+          find . -maxdepth 4 -type f | sort | head -200
+
       - name: Build debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
-      - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Forma-Donus-MYS-Design-v1.0.1-test.apk
-      - uses: actions/upload-artifact@v4
+
+      - name: Verify and rename APK
+        run: |
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk Forma-Donus-MYS-Design-v1.0.1-test.apk
+          ls -lh Forma-Donus-MYS-Design-v1.0.1-test.apk
+          sha256sum Forma-Donus-MYS-Design-v1.0.1-test.apk > Forma-Donus-MYS-Design-v1.0.1-test.apk.sha256
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
           name: Forma-Donus-MYS-Design-APK
-          path: Forma-Donus-MYS-Design-v1.0.1-test.apk
+          path: |
+            Forma-Donus-MYS-Design-v1.0.1-test.apk
+            Forma-Donus-MYS-Design-v1.0.1-test.apk.sha256
+          if-no-files-found: error
           retention-days: 30
