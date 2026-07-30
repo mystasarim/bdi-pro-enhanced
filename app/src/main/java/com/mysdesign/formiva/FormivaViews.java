@@ -2,15 +2,54 @@ package com.mysdesign.formiva;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.Typeface;
 import android.view.View;
 import android.view.animation.AccelerateDecelerateInterpolator;
+
+final class PhotoDraw {
+    private PhotoDraw() {}
+
+    static void centerCrop(Canvas canvas, Bitmap bitmap, RectF dst, Paint paint) {
+        if (bitmap == null || bitmap.isRecycled()) return;
+        float srcRatio = bitmap.getWidth() / (float) bitmap.getHeight();
+        float dstRatio = dst.width() / dst.height();
+        Rect src;
+        if (srcRatio > dstRatio) {
+            int srcWidth = Math.round(bitmap.getHeight() * dstRatio);
+            int left = (bitmap.getWidth() - srcWidth) / 2;
+            src = new Rect(left, 0, left + srcWidth, bitmap.getHeight());
+        } else {
+            int srcHeight = Math.round(bitmap.getWidth() / dstRatio);
+            int top = (bitmap.getHeight() - srcHeight) / 2;
+            src = new Rect(0, top, bitmap.getWidth(), top + srcHeight);
+        }
+        canvas.drawBitmap(bitmap, src, dst, paint);
+    }
+
+    static void fitCenter(Canvas canvas, Bitmap bitmap, RectF dst, Paint paint, float scale) {
+        if (bitmap == null || bitmap.isRecycled()) return;
+        float ratio = Math.min(dst.width() / bitmap.getWidth(), dst.height() / bitmap.getHeight()) * scale;
+        float width = bitmap.getWidth() * ratio;
+        float height = bitmap.getHeight() * ratio;
+        RectF target = new RectF(
+                dst.centerX() - width / 2f,
+                dst.centerY() - height / 2f,
+                dst.centerX() + width / 2f,
+                dst.centerY() + height / 2f
+        );
+        canvas.drawBitmap(bitmap, null, target, paint);
+    }
+}
 
 class FormivaLogoView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -25,14 +64,14 @@ class FormivaLogoView extends View {
         super.onDraw(canvas);
         float w = getWidth();
         float h = getHeight();
-        float icon = Math.min(h * 0.78f, w * 0.25f);
-        float left = 4f;
+        float icon = Math.min(h * 0.76f, w * 0.25f);
+        float left = 5f;
         float top = (h - icon) / 2f;
 
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeJoin(Paint.Join.ROUND);
-        paint.setStrokeWidth(icon * 0.16f);
+        paint.setStrokeWidth(icon * 0.15f);
         paint.setShader(new LinearGradient(left, top, left + icon, top + icon,
                 new int[]{Color.rgb(78, 215, 168), Color.rgb(0, 194, 255), Color.rgb(17, 77, 216)},
                 null, Shader.TileMode.CLAMP));
@@ -52,32 +91,33 @@ class FormivaLogoView extends View {
         canvas.drawPath(v, paint);
         paint.setShader(null);
 
-        float textLeft = left + icon + icon * 0.10f;
+        float textLeft = left + icon + icon * 0.11f;
         paint.setStyle(Paint.Style.FILL);
-        paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
-        paint.setTextSize(h * 0.45f);
+        paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        paint.setTextSize(h * 0.44f);
         paint.setColor(Color.rgb(11, 29, 58));
-        canvas.drawText("Formi", textLeft, h * 0.60f, paint);
+        canvas.drawText("Formi", textLeft, h * 0.59f, paint);
         float prefix = paint.measureText("Formi");
         paint.setShader(new LinearGradient(textLeft + prefix, 0, textLeft + prefix + h, 0,
                 Color.rgb(0, 194, 255), Color.rgb(78, 215, 168), Shader.TileMode.CLAMP));
-        canvas.drawText("va", textLeft + prefix, h * 0.60f, paint);
+        canvas.drawText("va", textLeft + prefix, h * 0.59f, paint);
         paint.setShader(null);
-        paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
-        paint.setTextSize(h * 0.18f);
+        paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        paint.setTextSize(h * 0.17f);
         paint.setColor(Color.rgb(102, 112, 133));
         canvas.drawText("Senin Dönüşümün. Senin Koçun.", textLeft, h * 0.86f, paint);
     }
 }
 
 class CoachAvatarView extends View {
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private boolean male = true;
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    private final Bitmap portrait;
     private boolean selected;
 
     CoachAvatarView(Context context, boolean male) {
         super(context);
-        this.male = male;
+        portrait = BitmapFactory.decodeResource(getResources(),
+                male ? R.drawable.male_coach : R.drawable.female_coach);
         setLayerType(LAYER_TYPE_SOFTWARE, null);
     }
 
@@ -91,99 +131,62 @@ class CoachAvatarView extends View {
         super.onDraw(canvas);
         float w = getWidth();
         float h = getHeight();
-        RectF box = new RectF(2, 2, w - 2, h - 2);
+        RectF box = new RectF(3, 3, w - 3, h - 3);
         Path clip = new Path();
-        clip.addRoundRect(box, 28, 28, Path.Direction.CW);
+        clip.addRoundRect(box, 30, 30, Path.Direction.CW);
         canvas.save();
         canvas.clipPath(clip);
+        paint.setColor(Color.rgb(240, 247, 248));
+        canvas.drawRect(box, paint);
+        PhotoDraw.centerCrop(canvas, portrait, box, paint);
 
-        paint.setShader(new LinearGradient(0, 0, w, h,
-                new int[]{Color.rgb(247, 250, 252), Color.rgb(232, 246, 242), Color.rgb(220, 240, 246)},
-                null, Shader.TileMode.CLAMP));
+        LinearGradient bottom = new LinearGradient(0, h * 0.60f, 0, h,
+                new int[]{Color.TRANSPARENT, Color.argb(125, 11, 29, 58)},
+                null, Shader.TileMode.CLAMP);
+        paint.setShader(bottom);
         canvas.drawRect(box, paint);
         paint.setShader(null);
-
-        float cx = w * 0.50f;
-        float headY = h * 0.28f;
-        float skin = male ? 0.0f : 1.0f;
-        int skinColor = skin > 0.5f ? Color.rgb(228, 178, 142) : Color.rgb(218, 164, 128);
-
-        paint.setColor(Color.rgb(27, 36, 55));
-        if (male) {
-            canvas.drawOval(new RectF(cx - w * 0.11f, headY - h * 0.11f,
-                    cx + w * 0.11f, headY + h * 0.10f), paint);
-        } else {
-            canvas.drawOval(new RectF(cx - w * 0.15f, headY - h * 0.13f,
-                    cx + w * 0.15f, headY + h * 0.17f), paint);
-            canvas.drawCircle(cx + w * 0.12f, headY - h * 0.02f, w * 0.07f, paint);
-        }
-
-        paint.setColor(skinColor);
-        canvas.drawOval(new RectF(cx - w * 0.085f, headY - h * 0.08f,
-                cx + w * 0.085f, headY + h * 0.08f), paint);
-        canvas.drawRoundRect(new RectF(cx - w * 0.035f, headY + h * 0.05f,
-                cx + w * 0.035f, headY + h * 0.14f), 12, 12, paint);
-
-        int clothing = male ? Color.rgb(11, 29, 58) : Color.rgb(20, 138, 121);
-        paint.setColor(clothing);
-        Path torso = new Path();
-        if (male) {
-            torso.moveTo(cx - w * 0.18f, h * 0.43f);
-            torso.quadTo(cx, h * 0.36f, cx + w * 0.18f, h * 0.43f);
-            torso.lineTo(cx + w * 0.13f, h * 0.82f);
-            torso.lineTo(cx - w * 0.13f, h * 0.82f);
-        } else {
-            torso.moveTo(cx - w * 0.14f, h * 0.43f);
-            torso.quadTo(cx, h * 0.38f, cx + w * 0.14f, h * 0.43f);
-            torso.lineTo(cx + w * 0.11f, h * 0.82f);
-            torso.lineTo(cx - w * 0.11f, h * 0.82f);
-        }
-        torso.close();
-        canvas.drawPath(torso, paint);
-
-        paint.setColor(skinColor);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setStrokeWidth(w * 0.075f);
-        canvas.drawLine(cx - w * 0.14f, h * 0.48f, cx + w * 0.13f, h * 0.66f, paint);
-        canvas.drawLine(cx + w * 0.14f, h * 0.48f, cx - w * 0.13f, h * 0.66f, paint);
-        paint.setStyle(Paint.Style.FILL);
-
-        if (selected) {
-            paint.setColor(Color.rgb(78, 215, 168));
-            canvas.drawCircle(w * 0.86f, h * 0.15f, w * 0.07f, paint);
-            paint.setColor(Color.WHITE);
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(w * 0.018f);
-            Path check = new Path();
-            check.moveTo(w * 0.825f, h * 0.15f);
-            check.lineTo(w * 0.85f, h * 0.175f);
-            check.lineTo(w * 0.90f, h * 0.115f);
-            canvas.drawPath(check, paint);
-            paint.setStyle(Paint.Style.FILL);
-        }
         canvas.restore();
 
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(selected ? 5 : 2);
-        paint.setColor(selected ? Color.rgb(78, 215, 168) : Color.rgb(222, 228, 235));
-        canvas.drawRoundRect(box, 28, 28, paint);
+        paint.setStrokeWidth(selected ? 6 : 2);
+        paint.setColor(selected ? Color.rgb(78, 215, 168) : Color.rgb(226, 232, 240));
+        canvas.drawRoundRect(box, 30, 30, paint);
         paint.setStyle(Paint.Style.FILL);
+
+        if (selected) {
+            float cx = w * 0.86f;
+            float cy = h * 0.14f;
+            float radius = Math.min(w, h) * 0.075f;
+            paint.setColor(Color.rgb(78, 215, 168));
+            canvas.drawCircle(cx, cy, radius, paint);
+            paint.setColor(Color.WHITE);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setStrokeWidth(Math.max(4f, radius * 0.24f));
+            Path check = new Path();
+            check.moveTo(cx - radius * 0.42f, cy);
+            check.lineTo(cx - radius * 0.10f, cy + radius * 0.32f);
+            check.lineTo(cx + radius * 0.48f, cy - radius * 0.35f);
+            canvas.drawPath(check, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
     }
 }
 
 class ExerciseVisualView extends View {
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final ValueAnimator animator;
+    private Bitmap model;
     private int exerciseIndex;
-    private boolean male = true;
     private float phase;
 
     ExerciseVisualView(Context context) {
         super(context);
         setLayerType(LAYER_TYPE_SOFTWARE, null);
         animator = ValueAnimator.ofFloat(0f, 1f);
-        animator.setDuration(1500);
+        animator.setDuration(1700);
         animator.setRepeatMode(ValueAnimator.REVERSE);
         animator.setRepeatCount(ValueAnimator.INFINITE);
         animator.setInterpolator(new AccelerateDecelerateInterpolator());
@@ -195,7 +198,8 @@ class ExerciseVisualView extends View {
 
     void setExercise(int exerciseIndex, boolean male) {
         this.exerciseIndex = exerciseIndex;
-        this.male = male;
+        model = BitmapFactory.decodeResource(getResources(),
+                male ? R.drawable.male_exercise : R.drawable.female_exercise);
         invalidate();
     }
 
@@ -211,66 +215,6 @@ class ExerciseVisualView extends View {
         super.onDetachedFromWindow();
     }
 
-    private float l(float a, float b) {
-        return a + (b - a) * phase;
-    }
-
-    private void limb(Canvas c, float x1, float y1, float x2, float y2, int color, float width) {
-        paint.setColor(color);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setStrokeWidth(width);
-        c.drawLine(x1, y1, x2, y2, paint);
-        paint.setStyle(Paint.Style.FILL);
-    }
-
-    private void mannequin(Canvas c, float headX, float headY, float shoulderX, float shoulderY,
-                           float hipX, float hipY,
-                           float elbowLX, float elbowLY, float handLX, float handLY,
-                           float elbowRX, float elbowRY, float handRX, float handRY,
-                           float kneeLX, float kneeLY, float ankleLX, float ankleLY,
-                           float kneeRX, float kneeRY, float ankleRX, float ankleRY) {
-        int skin = male ? Color.rgb(217, 165, 128) : Color.rgb(229, 181, 145);
-        int outfit = male ? Color.rgb(11, 29, 58) : Color.rgb(20, 138, 121);
-        float unit = Math.min(getWidth(), getHeight());
-        float limbWidth = unit * 0.034f;
-
-        limb(c, shoulderX, shoulderY, elbowLX, elbowLY, skin, limbWidth);
-        limb(c, elbowLX, elbowLY, handLX, handLY, skin, limbWidth * 0.82f);
-        limb(c, shoulderX, shoulderY, elbowRX, elbowRY, skin, limbWidth);
-        limb(c, elbowRX, elbowRY, handRX, handRY, skin, limbWidth * 0.82f);
-        limb(c, hipX, hipY, kneeLX, kneeLY, outfit, limbWidth * 1.15f);
-        limb(c, kneeLX, kneeLY, ankleLX, ankleLY, skin, limbWidth);
-        limb(c, hipX, hipY, kneeRX, kneeRY, outfit, limbWidth * 1.15f);
-        limb(c, kneeRX, kneeRY, ankleRX, ankleRY, skin, limbWidth);
-
-        paint.setColor(outfit);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setStrokeWidth(male ? unit * 0.11f : unit * 0.085f);
-        c.drawLine(shoulderX, shoulderY, hipX, hipY, paint);
-        paint.setStyle(Paint.Style.FILL);
-
-        paint.setColor(skin);
-        c.drawCircle(headX, headY, unit * 0.055f, paint);
-        paint.setColor(Color.rgb(30, 38, 54));
-        if (male) {
-            c.drawArc(new RectF(headX - unit * 0.055f, headY - unit * 0.06f,
-                    headX + unit * 0.055f, headY + unit * 0.04f), 190, 160, true, paint);
-        } else {
-            c.drawArc(new RectF(headX - unit * 0.068f, headY - unit * 0.07f,
-                    headX + unit * 0.068f, headY + unit * 0.065f), 175, 190, true, paint);
-            c.drawCircle(headX + unit * 0.055f, headY, unit * 0.026f, paint);
-        }
-
-        paint.setColor(Color.rgb(11, 29, 58));
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(unit * 0.018f);
-        c.drawLine(ankleLX - unit * 0.02f, ankleLY, ankleLX + unit * 0.045f, ankleLY, paint);
-        c.drawLine(ankleRX - unit * 0.02f, ankleRY, ankleRX + unit * 0.045f, ankleRY, paint);
-        paint.setStyle(Paint.Style.FILL);
-    }
-
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
@@ -281,172 +225,54 @@ class ExerciseVisualView extends View {
         clip.addRoundRect(area, 34, 34, Path.Direction.CW);
         canvas.save();
         canvas.clipPath(clip);
+
         paint.setShader(new LinearGradient(0, 0, w, h,
-                new int[]{Color.WHITE, Color.rgb(241, 249, 247), Color.rgb(230, 243, 248)},
+                new int[]{Color.WHITE, Color.rgb(239, 249, 246), Color.rgb(229, 242, 248)},
                 null, Shader.TileMode.CLAMP));
         canvas.drawRect(area, paint);
         paint.setShader(null);
-        paint.setColor(Color.rgb(216, 229, 232));
-        canvas.drawRoundRect(new RectF(w * 0.12f, h * 0.82f, w * 0.88f, h * 0.85f), 20, 20, paint);
 
-        switch (exerciseIndex) {
-            case 1: drawSquat(canvas, w, h); break;
-            case 2: case 6: drawPushUp(canvas, w, h, exerciseIndex == 6); break;
-            case 3: drawRow(canvas, w, h); break;
-            case 4: drawDeadlift(canvas, w, h); break;
-            case 5: drawBridge(canvas, w, h); break;
-            case 7: drawLunge(canvas, w, h); break;
-            case 8: drawPress(canvas, w, h); break;
-            case 9: drawSuperman(canvas, w, h); break;
-            case 10: drawSidePlank(canvas, w, h); break;
-            case 12: case 13: case 14: case 15: drawBreathing(canvas, w, h); break;
-            default: drawWalk(canvas, w, h); break;
-        }
-
+        float pulse = 0.96f + phase * 0.035f;
+        float lift = (phase - 0.5f) * h * 0.018f;
+        canvas.save();
+        canvas.translate(0, lift);
+        PhotoDraw.fitCenter(canvas, model,
+                new RectF(w * 0.06f, h * 0.07f, w * 0.94f, h * 0.87f), paint, pulse);
         canvas.restore();
+
+        paint.setColor(Color.argb(235, 11, 29, 58));
+        canvas.drawRoundRect(new RectF(w * 0.06f, h * 0.84f, w * 0.94f, h * 0.96f),
+                22, 22, paint);
+        paint.setColor(Color.WHITE);
+        paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        paint.setTextSize(Math.max(13f, h * 0.045f));
+        String text = exerciseIndex >= 0 && exerciseIndex < ExerciseData.NAMES.length
+                ? ExerciseData.NAMES[exerciseIndex] : "Formiva Egzersizi";
+        float textWidth = paint.measureText(text);
+        canvas.drawText(text, Math.max(w * 0.09f, (w - textWidth) / 2f), h * 0.92f, paint);
+        canvas.restore();
+
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(2);
         paint.setColor(Color.rgb(226, 232, 240));
         canvas.drawRoundRect(area, 34, 34, paint);
         paint.setStyle(Paint.Style.FILL);
     }
-
-    private void drawWalk(Canvas c, float w, float h) {
-        float cx = w * 0.50f;
-        float step = (phase - 0.5f) * w * 0.18f;
-        mannequin(c, cx, h * 0.22f, cx, h * 0.35f, cx, h * 0.57f,
-                cx - step, h * 0.45f, cx - step * 1.4f, h * 0.58f,
-                cx + step, h * 0.45f, cx + step * 1.4f, h * 0.58f,
-                cx - step, h * 0.70f, cx - step * 1.7f, h * 0.82f,
-                cx + step, h * 0.70f, cx + step * 1.7f, h * 0.82f);
-    }
-
-    private void drawSquat(Canvas c, float w, float h) {
-        float drop = l(0, h * 0.18f);
-        float cx = w * 0.50f;
-        mannequin(c, cx, h * 0.20f + drop, cx, h * 0.34f + drop, cx, h * 0.56f + drop,
-                w * 0.39f, h * 0.43f + drop, w * 0.55f, h * 0.47f + drop,
-                w * 0.61f, h * 0.43f + drop, w * 0.45f, h * 0.47f + drop,
-                l(w * 0.45f, w * 0.34f), l(h * 0.70f, h * 0.73f), w * 0.30f, h * 0.83f,
-                l(w * 0.55f, w * 0.66f), l(h * 0.70f, h * 0.73f), w * 0.70f, h * 0.83f);
-    }
-
-    private void drawPushUp(Canvas c, float w, float h, boolean plank) {
-        float bend = plank ? 0 : l(0, h * 0.11f);
-        mannequin(c, w * 0.73f, h * 0.47f + bend * 0.35f,
-                w * 0.61f, h * 0.52f + bend * 0.45f,
-                w * 0.39f, h * 0.58f + bend * 0.2f,
-                w * 0.62f, h * 0.65f, w * 0.69f, h * 0.80f,
-                w * 0.55f, h * 0.65f, w * 0.50f, h * 0.80f,
-                w * 0.29f, h * 0.66f, w * 0.20f, h * 0.80f,
-                w * 0.31f, h * 0.66f, w * 0.22f, h * 0.80f);
-    }
-
-    private void drawRow(Canvas c, float w, float h) {
-        float pull = l(0, w * 0.12f);
-        mannequin(c, w * 0.59f, h * 0.30f, w * 0.53f, h * 0.42f, w * 0.44f, h * 0.58f,
-                w * 0.43f, h * 0.50f, w * 0.30f + pull, h * 0.58f,
-                w * 0.61f, h * 0.50f, w * 0.73f - pull, h * 0.58f,
-                w * 0.38f, h * 0.70f, w * 0.31f, h * 0.82f,
-                w * 0.55f, h * 0.70f, w * 0.61f, h * 0.82f);
-        paint.setColor(Color.rgb(11, 29, 58));
-        c.drawCircle(w * 0.30f + pull, h * 0.58f, w * 0.025f, paint);
-        c.drawCircle(w * 0.73f - pull, h * 0.58f, w * 0.025f, paint);
-    }
-
-    private void drawDeadlift(Canvas c, float w, float h) {
-        float hinge = l(0, h * 0.20f);
-        mannequin(c, w * 0.50f + hinge * 0.35f, h * 0.20f + hinge,
-                w * 0.50f + hinge * 0.20f, h * 0.34f + hinge * 0.75f,
-                w * 0.50f, h * 0.56f,
-                w * 0.43f, h * 0.46f + hinge, w * 0.43f, h * 0.63f + hinge * 0.45f,
-                w * 0.57f, h * 0.46f + hinge, w * 0.57f, h * 0.63f + hinge * 0.45f,
-                w * 0.42f, h * 0.70f, w * 0.38f, h * 0.83f,
-                w * 0.58f, h * 0.70f, w * 0.62f, h * 0.83f);
-    }
-
-    private void drawBridge(Canvas c, float w, float h) {
-        float lift = l(0, h * 0.15f);
-        mannequin(c, w * 0.75f, h * 0.66f, w * 0.65f, h * 0.66f - lift * 0.5f,
-                w * 0.45f, h * 0.69f - lift,
-                w * 0.66f, h * 0.74f, w * 0.57f, h * 0.79f,
-                w * 0.69f, h * 0.74f, w * 0.77f, h * 0.79f,
-                w * 0.34f, h * 0.68f, w * 0.28f, h * 0.82f,
-                w * 0.38f, h * 0.68f, w * 0.44f, h * 0.82f);
-    }
-
-    private void drawLunge(Canvas c, float w, float h) {
-        float drop = l(0, h * 0.15f);
-        mannequin(c, w * 0.50f, h * 0.20f + drop, w * 0.50f, h * 0.34f + drop,
-                w * 0.50f, h * 0.56f + drop,
-                w * 0.40f, h * 0.45f + drop, w * 0.50f, h * 0.52f + drop,
-                w * 0.60f, h * 0.45f + drop, w * 0.50f, h * 0.52f + drop,
-                w * 0.37f, h * 0.69f + drop * 0.35f, w * 0.25f, h * 0.82f,
-                w * 0.63f, h * 0.69f + drop * 0.35f, w * 0.77f, h * 0.82f);
-    }
-
-    private void drawPress(Canvas c, float w, float h) {
-        float up = l(0, h * 0.22f);
-        mannequin(c, w * 0.50f, h * 0.21f, w * 0.50f, h * 0.35f, w * 0.50f, h * 0.58f,
-                w * 0.39f, h * 0.42f - up * 0.5f, w * 0.38f, h * 0.36f - up,
-                w * 0.61f, h * 0.42f - up * 0.5f, w * 0.62f, h * 0.36f - up,
-                w * 0.43f, h * 0.71f, w * 0.40f, h * 0.83f,
-                w * 0.57f, h * 0.71f, w * 0.60f, h * 0.83f);
-        paint.setColor(Color.rgb(11, 29, 58));
-        c.drawCircle(w * 0.38f, h * 0.36f - up, w * 0.026f, paint);
-        c.drawCircle(w * 0.62f, h * 0.36f - up, w * 0.026f, paint);
-    }
-
-    private void drawSuperman(Canvas c, float w, float h) {
-        float lift = l(0, h * 0.10f);
-        mannequin(c, w * 0.73f, h * 0.67f - lift, w * 0.62f, h * 0.70f - lift,
-                w * 0.47f, h * 0.72f - lift * 0.6f,
-                w * 0.77f, h * 0.62f - lift, w * 0.88f, h * 0.55f - lift,
-                w * 0.70f, h * 0.62f - lift, w * 0.82f, h * 0.52f - lift,
-                w * 0.36f, h * 0.74f - lift, w * 0.22f, h * 0.68f - lift,
-                w * 0.38f, h * 0.76f - lift, w * 0.24f, h * 0.73f - lift);
-    }
-
-    private void drawSidePlank(Canvas c, float w, float h) {
-        float lift = l(0, h * 0.08f);
-        mannequin(c, w * 0.73f, h * 0.48f - lift, w * 0.62f, h * 0.52f - lift,
-                w * 0.42f, h * 0.61f - lift,
-                w * 0.62f, h * 0.68f, w * 0.58f, h * 0.80f,
-                w * 0.58f, h * 0.40f - lift, w * 0.54f, h * 0.26f - lift,
-                w * 0.31f, h * 0.68f, w * 0.20f, h * 0.80f,
-                w * 0.33f, h * 0.65f, w * 0.22f, h * 0.80f);
-    }
-
-    private void drawBreathing(Canvas c, float w, float h) {
-        mannequin(c, w * 0.50f, h * 0.22f, w * 0.50f, h * 0.36f, w * 0.50f, h * 0.59f,
-                w * 0.39f, h * 0.48f, w * 0.45f, h * 0.58f,
-                w * 0.61f, h * 0.48f, w * 0.55f, h * 0.58f,
-                w * 0.41f, h * 0.72f, w * 0.33f, h * 0.82f,
-                w * 0.59f, h * 0.72f, w * 0.67f, h * 0.82f);
-        float radius = l(w * 0.035f, w * 0.085f);
-        paint.setColor(Color.argb(80, 78, 215, 168));
-        c.drawCircle(w * 0.50f, h * 0.56f, radius, paint);
-        paint.setColor(Color.rgb(78, 215, 168));
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(5);
-        c.drawCircle(w * 0.50f, h * 0.56f, radius, paint);
-        paint.setStyle(Paint.Style.FILL);
-    }
 }
 
 class ProgressRingView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private String primary = "0";
-    private String secondary = "";
+    private String value = "0";
+    private String caption = "";
     private float progress;
 
     ProgressRingView(Context context) {
         super(context);
     }
 
-    void setValues(String primary, String secondary, float progress) {
-        this.primary = primary;
-        this.secondary = secondary;
+    void setValues(String value, String caption, float progress) {
+        this.value = value;
+        this.caption = caption;
         this.progress = Math.max(0f, Math.min(1f, progress));
         invalidate();
     }
@@ -454,34 +280,86 @@ class ProgressRingView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        float size = Math.min(getWidth(), getHeight());
-        float stroke = size * 0.10f;
-        RectF oval = new RectF(stroke, stroke, getWidth() - stroke, getHeight() - stroke);
+        float w = getWidth();
+        float h = getHeight();
+        float size = Math.min(w, h);
+        float stroke = size * 0.085f;
+        RectF ring = new RectF((w - size) / 2f + stroke, (h - size) / 2f + stroke,
+                (w + size) / 2f - stroke, (h + size) / 2f - stroke);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeWidth(stroke);
-        paint.setColor(Color.rgb(231, 237, 242));
-        canvas.drawArc(oval, -90, 360, false, paint);
-        paint.setShader(new LinearGradient(0, 0, getWidth(), getHeight(),
-                Color.rgb(78, 215, 168), Color.rgb(0, 194, 255), Shader.TileMode.CLAMP));
-        canvas.drawArc(oval, -90, 360 * progress, false, paint);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(Color.rgb(228, 235, 241));
+        canvas.drawArc(ring, -90, 360, false, paint);
+        paint.setShader(new LinearGradient(ring.left, ring.top, ring.right, ring.bottom,
+                Color.rgb(17, 77, 216), Color.rgb(78, 215, 168), Shader.TileMode.CLAMP));
+        canvas.drawArc(ring, -90, 360f * progress, false, paint);
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
+        paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         paint.setTextSize(size * 0.25f);
         paint.setColor(Color.rgb(11, 29, 58));
-        canvas.drawText(primary, getWidth() / 2f, getHeight() * 0.52f, paint);
-        paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
-        paint.setTextSize(size * 0.10f);
+        canvas.drawText(value, w / 2f, h / 2f + size * 0.03f, paint);
+        paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        paint.setTextSize(size * 0.09f);
         paint.setColor(Color.rgb(102, 112, 133));
-        canvas.drawText(secondary, getWidth() / 2f, getHeight() * 0.68f, paint);
+        canvas.drawText(caption, w / 2f, h / 2f + size * 0.18f, paint);
+        paint.setTextAlign(Paint.Align.LEFT);
+    }
+}
+
+class WaveformView extends View {
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final ValueAnimator animator;
+    private float phase;
+
+    WaveformView(Context context) {
+        super(context);
+        animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(1200);
+        animator.setRepeatMode(ValueAnimator.REVERSE);
+        animator.setRepeatCount(ValueAnimator.INFINITE);
+        animator.addUpdateListener(value -> {
+            phase = (float) value.getAnimatedValue();
+            invalidate();
+        });
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        animator.start();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        animator.cancel();
+        super.onDetachedFromWindow();
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        float w = getWidth();
+        float h = getHeight();
+        int bars = 22;
+        float gap = w / bars;
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeWidth(Math.max(3f, gap * 0.28f));
+        paint.setColor(Color.rgb(78, 215, 168));
+        for (int i = 0; i < bars; i++) {
+            float wave = (float) Math.abs(Math.sin(i * 0.58f + phase * Math.PI * 2));
+            float barHeight = h * (0.18f + wave * 0.62f);
+            float x = gap * (i + 0.5f);
+            canvas.drawLine(x, (h - barHeight) / 2f, x, (h + barHeight) / 2f, paint);
+        }
     }
 }
 
 class MiniLineChartView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private float[] values = {0.9f, 0.78f, 0.81f, 0.62f, 0.52f, 0.38f, 0.30f};
+    private float[] values = new float[]{0.3f, 0.45f, 0.42f, 0.6f, 0.7f};
 
     MiniLineChartView(Context context) {
         super(context);
@@ -497,79 +375,32 @@ class MiniLineChartView extends View {
         super.onDraw(canvas);
         float w = getWidth();
         float h = getHeight();
-        paint.setColor(Color.rgb(232, 237, 242));
-        paint.setStrokeWidth(2);
-        for (int i = 1; i <= 3; i++) {
-            float y = h * i / 4f;
-            canvas.drawLine(0, y, w, y, paint);
-        }
-        Path path = new Path();
-        for (int i = 0; i < values.length; i++) {
-            float x = w * i / (values.length - 1f);
-            float y = h * (0.12f + 0.75f * values[i]);
-            if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
-        }
+        float left = w * 0.06f;
+        float right = w * 0.94f;
+        float top = h * 0.12f;
+        float bottom = h * 0.85f;
+
         paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(1.5f);
+        paint.setColor(Color.rgb(232, 237, 242));
+        for (int i = 0; i < 4; i++) {
+            float y = top + (bottom - top) * i / 3f;
+            canvas.drawLine(left, y, right, y, paint);
+        }
+
+        Path line = new Path();
+        for (int i = 0; i < values.length; i++) {
+            float x = left + (right - left) * i / (values.length - 1f);
+            float y = bottom - Math.max(0f, Math.min(1f, values[i])) * (bottom - top);
+            if (i == 0) line.moveTo(x, y); else line.lineTo(x, y);
+        }
+        paint.setStrokeWidth(6f);
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeJoin(Paint.Join.ROUND);
-        paint.setStrokeWidth(6);
-        paint.setShader(new LinearGradient(0, 0, w, 0,
-                Color.rgb(78, 215, 168), Color.rgb(0, 194, 255), Shader.TileMode.CLAMP));
-        canvas.drawPath(path, paint);
+        paint.setShader(new LinearGradient(left, 0, right, 0,
+                Color.rgb(17, 77, 216), Color.rgb(78, 215, 168), Shader.TileMode.CLAMP));
+        canvas.drawPath(line, paint);
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(17, 77, 216));
-        for (int i = 0; i < values.length; i++) {
-            float x = w * i / (values.length - 1f);
-            float y = h * (0.12f + 0.75f * values[i]);
-            canvas.drawCircle(x, y, 5, paint);
-        }
-    }
-}
-
-class WaveformView extends View {
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final ValueAnimator animator;
-    private float phase;
-
-    WaveformView(Context context) {
-        super(context);
-        animator = ValueAnimator.ofFloat(0f, 1f);
-        animator.setDuration(900);
-        animator.setRepeatCount(ValueAnimator.INFINITE);
-        animator.addUpdateListener(a -> {
-            phase = (float) a.getAnimatedValue();
-            invalidate();
-        });
-    }
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        animator.start();
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        animator.cancel();
-        super.onDetachedFromWindow();
-    }
-
-    @Override
-    protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas);
-        int bars = 22;
-        float gap = getWidth() / (float) bars;
-        paint.setStrokeWidth(Math.max(3, gap * 0.32f));
-        paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setShader(new LinearGradient(0, 0, getWidth(), 0,
-                Color.rgb(78, 215, 168), Color.rgb(0, 194, 255), Shader.TileMode.CLAMP));
-        for (int i = 0; i < bars; i++) {
-            float wave = (float) (0.20 + 0.70 * Math.abs(Math.sin(i * 0.72 + phase * Math.PI * 2)));
-            float barH = getHeight() * wave;
-            float x = gap * i + gap / 2f;
-            canvas.drawLine(x, (getHeight() - barH) / 2f, x, (getHeight() + barH) / 2f, paint);
-        }
-        paint.setShader(null);
     }
 }
