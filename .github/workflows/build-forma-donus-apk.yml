@@ -8,6 +8,14 @@ on:
       - 'build.gradle'
       - 'settings.gradle'
       - '.github/workflows/build-forma-donus-apk.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - '.github/workflows/build-forma-donus-apk.yml'
+      - '.github/FORMIVA_BUILD_VALIDATION.md'
   workflow_dispatch:
 
 jobs:
